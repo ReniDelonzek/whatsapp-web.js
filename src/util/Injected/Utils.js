@@ -59,7 +59,7 @@ exports.LoadUtils = () => {
     window.WWebJS.injectToFunction = (target, callback) => {
         try {
             let module = window.require(target.module);
-            if (!module) return; 
+            if (!module) return;
 
             const path = target.function.split('.');
             const funcName = path.pop();
@@ -89,11 +89,11 @@ exports.LoadUtils = () => {
 
     window.WWebJS.injectToFunction({ module: 'WAWebE2EProtoUtils', function: 'typeAttributeFromProtobuf' }, (module, func, ...args) => { const [proto] = args; return proto.locationMessage || proto.groupInviteMessage ? 'text' : func(...args); });
 
-    
+
     window.WWebJS.forwardMessage = async (chatId, msgId) => {
         const msg = (window.require('WAWebCollections')).Msg.get(msgId) || (await (window.require('WAWebCollections')).Msg.getMessagesById([msgId]))?.messages?.[0];
         const chat = await window.WWebJS.getChat(chatId, { getAsModel: false });
-        return await (window.require('WAWebChatForwardMessage')).forwardMessages({'chat': chat, 'msgs' : [msg], 'multicast': true, 'includeCaption': true, 'appendedText' : undefined});
+        return await (window.require('WAWebChatForwardMessage')).forwardMessages({ 'chat': chat, 'msgs': [msg], 'multicast': true, 'includeCaption': true, 'appendedText': undefined });
     };
 
     window.WWebJS.sendSeen = async (chatId) => {
@@ -103,7 +103,7 @@ exports.LoadUtils = () => {
             await (window.require('WAWebUpdateUnreadChatAction')).sendSeen({
                 chat: chat,
                 threadId: undefined
-            });         
+            });
             window.require('WAWebStreamModel').Stream.markUnavailable();
             return true;
         }
@@ -116,10 +116,10 @@ exports.LoadUtils = () => {
         const isStatus = getIsBroadcast(chat);
 
         const { findLink } = window.require('WALinkify');
-        
+
         let mediaOptions = {};
         if (options.media) {
-            mediaOptions =  options.sendMediaAsSticker && !isChannel && !isStatus
+            mediaOptions = options.sendMediaAsSticker && !isChannel && !isStatus
                 ? await window.WWebJS.processStickerData(options.media)
                 : await window.WWebJS.processMediaData(options.media, {
                     forceSticker: options.sendMediaAsSticker,
@@ -156,7 +156,7 @@ exports.LoadUtils = () => {
                     throw new Error('Could not get the quoted message.');
                 }
             }
-            
+
             delete options.ignoreQuoteErrors;
             delete options.quotedMessageId;
         }
@@ -277,7 +277,7 @@ exports.LoadUtils = () => {
                     preview = preview.data;
                     preview.preview = true;
                     preview.subtype = 'url';
-                    options = {...options, ...preview};
+                    options = { ...options, ...preview };
                 }
             }
         }
@@ -384,7 +384,7 @@ exports.LoadUtils = () => {
             ...botOptions,
             ...extraOptions
         };
-        
+
         // Bot's won't reply if canonicalUrl is set (linking)
         if (botOptions) {
             delete message.canonicalUrl;
@@ -458,11 +458,11 @@ exports.LoadUtils = () => {
 
         return (window.require('WAWebCollections')).Msg.get(newMsgKey._serialized);
     };
-	
+
     window.WWebJS.editMessage = async (msg, content, options = {}) => {
         const extraOptions = options.extraOptions || {};
         delete options.extraOptions;
-        
+
         if (options.mentionedJidList) {
             options.mentionedJidList = options.mentionedJidList.map((id) => window.require('WAWebWidFactory').createWid(id));
             options.mentionedJidList = options.mentionedJidList.filter(Boolean);
@@ -552,11 +552,11 @@ exports.LoadUtils = () => {
             isPtt: forceVoice,
             asDocument: forceDocument
         };
-      
+
         if (forceMediaHd && file.type.indexOf('image/') === 0) {
             mediaParams.maxDimension = 2560;
         }
-      
+
         const mediaPrep = window.require('WAWebPrepRawMedia').prepRawMedia(opaqueData, mediaParams);
         const mediaData = await mediaPrep.waitForPrep();
         const mediaObject = window.require('WAWebMediaStorage').getOrCreateMediaObject(mediaData.filehash);
@@ -585,7 +585,7 @@ exports.LoadUtils = () => {
 
         mediaData.renderableUrl = mediaData.mediaBlob.url();
         mediaObject.consolidate(mediaData.toJSON());
-        
+
         mediaData.mediaBlob.autorelease();
         const shouldUseMediaCache = (window.require('WAWebMediaDataUtils')).shouldUseMediaCache(
             window.require('WAWebMmsMediaTypes').castToV4(mediaObject.type)
@@ -634,7 +634,7 @@ exports.LoadUtils = () => {
         const msg = message.serialize();
 
         const { findLinks } = window.require('WALinkify');
-        
+
         msg.isEphemeral = message.isEphemeral;
         msg.isStatusV3 = message.isStatusV3;
         msg.links = findLinks(message.mediaObject ? message.caption : message.body).map((link) => ({
@@ -677,7 +677,25 @@ exports.LoadUtils = () => {
                 chat = null;
             }
         } else {
-            chat = (window.require('WAWebCollections')).Chat.get(chatWid) || (await (window.require('WAWebFindChatAction')).findOrCreateLatestChat(chatWid))?.chat;
+            chat = (window.require('WAWebCollections')).Chat.get(chatWid);
+            if (!chat) {
+                chat = (await (window.require('WAWebFindChatAction')).findOrCreateLatestChat(chatWid).catch(() => null))?.chat;
+            }
+            if (!chat) {
+                try {
+                    const query = window.require('WAWebContactSyncUtils').constructUsyncDeltaQuery([{
+                        type: 'add',
+                        phoneNumber: chatWid.user
+                    }]);
+                    const result = await query.execute();
+                    if (result?.list?.[0]?.lid) {
+                        const chatLid = window.Store.WidFactory.createWid(result.list[0].lid);
+                        chat = (await window.Store.FindOrCreateChat.findOrCreateLatestChat(chatLid).catch(() => null))?.chat;
+                    }
+                } catch (e) {
+                    // LID resolution failed, chat remains undefined
+                }
+            }
         }
 
         return getAsModel && chat
@@ -780,9 +798,9 @@ exports.LoadUtils = () => {
         if (contact.businessProfile) {
             res.businessProfile = contact.businessProfile.serialize();
         }
-        
+
         res.isBlocked = contact.isContactBlocked;
-        
+
         const ContactMethods = window.require('WAWebContactGetters');
         res.isMe = ContactMethods.getIsMe(contact);
         res.isUser = ContactMethods.getIsUser(contact);
@@ -795,7 +813,7 @@ exports.LoadUtils = () => {
         res.name = ContactMethods.getName(contact);
         res.shortName = ContactMethods.getShortName(contact);
         res.pushname = ContactMethods.getPushname(contact);
-        
+
         const { getIsMyContact } = window.require('WAWebFrontendContactGetters');
         res.isMyContact = getIsMyContact(contact);
         res.isEnterprise = ContactMethods.getIsEnterprise(contact);
@@ -930,17 +948,17 @@ exports.LoadUtils = () => {
 
         const ChatState = window.require('WAWebChatStateBridge');
         switch (state) {
-        case 'typing':
-            await ChatState.sendChatStateComposing(chatId);
-            break;
-        case 'recording':
-            await ChatState.sendChatStateRecording(chatId);
-            break;
-        case 'stop':
-            await ChatState.sendChatStatePaused(chatId);
-            break;
-        default:
-            throw 'Invalid chatstate';
+            case 'typing':
+                await ChatState.sendChatStateComposing(chatId);
+                break;
+            case 'recording':
+                await ChatState.sendChatStateRecording(chatId);
+                break;
+            case 'stop':
+                await ChatState.sendChatStatePaused(chatId);
+                break;
+            default:
+                throw 'Invalid chatstate';
         }
 
         return true;
@@ -999,7 +1017,7 @@ exports.LoadUtils = () => {
         ]);
         await (window.require('WADeprecatedSendIq')).deprecatedCastStanza(stanza);
     };
-    
+
     window.WWebJS.cropAndResizeImage = async (media, options = {}) => {
         if (!media.mimetype.includes('image'))
             throw new Error('Media is not an image');
@@ -1009,7 +1027,7 @@ exports.LoadUtils = () => {
 
         options = Object.assign({ size: 640, mimetype: media.mimetype, quality: .75, asDataUrl: false }, options);
 
-        const img = await new Promise ((resolve, reject) => {
+        const img = await new Promise((resolve, reject) => {
             const img = new Image();
             img.onload = () => resolve(img);
             img.onerror = reject;
@@ -1064,11 +1082,11 @@ exports.LoadUtils = () => {
             const res = await (window.require('WAWebContactProfilePicThumbBridge')).requestDeletePicture(chatWid);
             return res ? res.status === 200 : false;
         } catch (err) {
-            if(err.name === 'ServerStatusCodeError') return false;
+            if (err.name === 'ServerStatusCodeError') return false;
             throw err;
         }
     };
-    
+
     window.WWebJS.getProfilePicThumbToBase64 = async (chatWid) => {
         const profilePicCollection = await (window.require('WAWebCollections')).ProfilePicThumb.find(chatWid);
 
@@ -1178,7 +1196,7 @@ exports.LoadUtils = () => {
         }));
 
         const groupJid = window.require('WAWebWidToJid').widToGroupJid(groupWid);
-        
+
         const _getSleepTime = (sleep) => {
             if (!Array.isArray(sleep) || (sleep.length === 2 && sleep[0] === sleep[1])) {
                 return sleep;
@@ -1269,17 +1287,17 @@ exports.LoadUtils = () => {
         if (!message) return false;
 
         if (typeof duration !== 'number') return false;
-        
+
         const originalFunction = window.require('WAWebPinMsgConstants').getPinExpiryDuration;
         window.require('WAWebPinMsgConstants').getPinExpiryDuration = () => duration;
-        
+
         const response = await (window.require('WAWebSendPinMessageAction')).sendPinInChatMsg(message, action, duration);
 
         window.require('WAWebPinMsgConstants').getPinExpiryDuration = originalFunction;
 
         return response.messageSendResult === 'OK';
     };
-    
+
     window.WWebJS.getStatusModel = status => {
         const res = status.serialize();
         delete res._msgs;
