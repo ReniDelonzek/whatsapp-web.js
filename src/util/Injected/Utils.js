@@ -689,8 +689,8 @@ exports.LoadUtils = () => {
                     }]);
                     const result = await query.execute();
                     if (result?.list?.[0]?.lid) {
-                        const chatLid = window.Store.WidFactory.createWid(result.list[0].lid);
-                        chat = (await window.Store.FindOrCreateChat.findOrCreateLatestChat(chatLid).catch(() => null))?.chat;
+                        const chatLid = window.require('WAWebWidFactory').createWid(result.list[0].lid);
+                        chat = (await (window.require('WAWebFindChatAction')).findOrCreateLatestChat(chatLid).catch(() => null))?.chat;
                     }
                 } catch (e) {
                     // LID resolution failed, chat remains undefined
